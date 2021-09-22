@@ -5,6 +5,7 @@ from solvation_analysis.analysis_library import (
     Speciation,
     Coordination,
     Pairing,
+    Valency,
 )
 
 
@@ -64,3 +65,7 @@ def test_pairing(name, percent, solvation_data):
     pairing = Pairing(solvation_data, 10, 49)
     np.testing.assert_allclose([percent], pairing.pairing_dict[name], atol=0.05)
     assert len(pairing.pairing_by_frame) == 3
+
+
+def test_valency(solvation_data_dup):
+    valency = Valency(solvation_data_dup, 10, 49)
