@@ -267,3 +267,20 @@ class Pairing:
         pairing_normalized = pairing_series / self.n_frames
         pairing_dict = pairing_normalized.groupby(["res_name"]).sum().to_dict()
         return pairing_dict, pairing_by_frame
+
+
+class Valency:
+
+    def __init__(self, solvation_data_dup, n_frames, n_solutes):
+        self.solvation_data_dup = solvation_data_dup
+        self.valency = self._solvent_valency()
+
+    def _solvent_valency(self):
+        # determine the count of ions in shell
+        valency_counts = (self.solvation_data_dup
+                          .groupby(['frame', 'solvated_atom', 'res_name', 'res_id'])
+                          .size()
+                          .reset_index(['res_name', 'res_id'])
+                          )
+        return 1
+
