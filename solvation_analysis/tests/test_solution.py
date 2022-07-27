@@ -3,6 +3,9 @@ import warnings
 import pytest
 from solvation_analysis.solution import Solution
 import numpy as np
+from MDAnalysis import Universe
+
+from solvation_analysis.tests.conftest import u_eax_series, u_eax_atom_groups
 
 
 def test_instantiate_solute(pre_solution):
@@ -13,6 +16,17 @@ def test_instantiate_solute(pre_solution):
     assert pre_solution.solvents['pf6'].n_residues == 49
     assert pre_solution.solvents['fec'].n_residues == 237
     assert pre_solution.solvents['bn'].n_residues == 363
+
+
+def test_networking_instantiation_error(atom_groups):
+    li = atom_groups['li']
+    pf6 = atom_groups['pf6']
+    bn = atom_groups['bn']
+    fec = atom_groups['fec']
+    with pytest.raises(Exception):
+        solution = Solution(
+            li, {'pf6': pf6, 'bn': bn, 'fec': fec}, analysis_classes=['networking']
+        )
 
 
 def test_plot_solvation_distance(rdf_bins_and_data_easy):
@@ -48,6 +62,19 @@ def test_run(pre_solution_mutable):
     assert len(pre_solution_mutable.solvation_data) == 2312
 
 
+def test_run_w_all(pre_solution_mutable):
+    # checks that run is run correctly
+    pre_solution_mutable.radii = {'pf6': 2.8}
+    pre_solution_mutable.analysis_classes = [
+        "pairing", "coordination", "speciation", "residence", "networking"
+    ]
+    pre_solution_mutable.networking_solvents = 'pf6'
+    pre_solution_mutable.run(step=1)
+    assert len(pre_solution_mutable.solvation_frames) == 10
+    assert len(pre_solution_mutable.solvation_frames[0]) == 228
+    assert len(pre_solution_mutable.solvation_data) == 2312
+
+
 @pytest.mark.parametrize(
     "solute_index, radius, frame, expected_res_ids",
     [
@@ -72,7 +99,6 @@ def test_radial_shell(solute_index, radius, frame, expected_res_ids, run_solutio
 )
 def test_closest_n_mol(solute_index, n_mol, frame, expected_res_ids, run_solution):
     run_solution.u.trajectory[frame]
-    sol = run_solution
     shell = run_solution.closest_n_mol(solute_index, n_mol)
     assert set(shell.resindices) == set(expected_res_ids)
 
@@ -118,7 +144,7 @@ def test_solvation_shell_remove_closest(solute_index, step, n, expected_res_ids,
 
 
 @pytest.mark.parametrize(
-    "network, n_clusters",
+    "shell, n_shells",
     [
         ({'bn': 5, 'fec': 0, 'pf6': 0}, 175),
         ({'bn': 3, 'fec': 3, 'pf6': 0}, 2),
@@ -126,10 +152,10 @@ def test_solvation_shell_remove_closest(solute_index, step, n, expected_res_ids,
         ({'bn': 4}, 260),
     ],
 )
-def test_speciation_find_clusters(cluster, n_clusters, run_solution):
+def test_speciation_find_shells(shell, n_shells, run_solution):
     # duplicated to test in solution
-    df = run_solution.speciation.find_shells(cluster)
-    assert len(df) == n_clusters
+    df = run_solution.speciation.find_shells(shell)
+    assert len(df) == n_shells
 
 
 @pytest.mark.parametrize(
@@ -158,3 +184,20 @@ def test_pairing(name, percent, run_solution):
     # duplicated to test in solution
     pairing_dict = run_solution.pairing.pairing_dict
     np.testing.assert_allclose([percent], pairing_dict[name], atol=0.05)
+
+
+@pytest.mark.parametrize("name", ['ea', 'eaf', 'fea', 'feaf'])
+def test_instantiate_eax_solvents(name, u_eax_series):
+    assert isinstance(u_eax_series[name], Universe)
+
+
+@pytest.mark.parametrize("name", ['ea', 'eaf', 'fea', 'feaf'])
+def test_instantiate_eax_atom_groups(name, u_eax_atom_groups):
+    all_atoms = len(u_eax_atom_groups[name]['li'].universe.atoms)
+    all_atoms_in_groups = sum([len(ag) for ag in u_eax_atom_groups[name].values()])
+    assert all_atoms_in_groups == all_atoms
+
+
+@pytest.mark.parametrize("name", ['ea', 'eaf', 'fea', 'feaf'])
+def test_instantiate_eax_solutions(name, eax_solutions):
+    assert isinstance(eax_solutions[name], Solution)
